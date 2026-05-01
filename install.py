@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from subprocess import run, PIPE
+import warnings
 import shutil
 import os
 
@@ -166,3 +167,54 @@ if __name__ == "__main__":
         shellrc.write("alias la='ls -A'\n")
         shellrc.write("alias l='ls -CF'\n")
         shellrc.write("alias c=clear\n")
+
+    # TODO: install com.mattjakeman.ExtensionManager using flatpak, if flatpak is not installed, 
+    # prompt user to install flatpak manually and then install com.mattjakeman.ExtensionManager using flatpak
+    if not is_package_installed("flatpak"):
+        warnings.warn(
+            "Flatpak is not installed. Please install and configure Flatpak manually and "
+            "install com.mattjakeman.ExtensionManager using Flatpak to manage your shell extensions."
+        )
+
+    # backup $HOME/.local/share/gnome-shell/extensions
+    os.makedirs(f"{os.getenv('HOME')}/.local/share/gnome-shell/extensions", exist_ok=True)
+    run_command((
+        f"mv {os.getenv('HOME')}/.local/share/gnome-shell/extensions "
+        f"{os.getenv('HOME')}/.local/share/gnome-shell/extensions.bak"
+    ), shell=True)
+
+    run_command((
+        "ln -s "
+        "$(pwd)/extensions/local "
+        f"{os.getenv('HOME')}/.local/share/gnome-shell/extensions"
+    ), shell=True)
+
+    if not is_package_installed("gnome-shell-extension-appindicator"):
+        install_package(pkgmgr, "gnome-shell-extension-appindicator")
+    if not is_package_installed("gnome-shell-extension-dash-to-dock"):
+        install_package(pkgmgr, "gnome-shell-extension-dash-to-dock")
+    
+    run_command("sudo mkdir -p /usr/share/gnome-shell/extensions/", shell=True)
+    if os.path.exists("/usr/share/gnome-shell/extensions/appindicatorsupport@rgcjonas.gmail.com"):
+        run_command((
+            "sudo mv "
+            "/usr/share/gnome-shell/extensions/appindicatorsupport@rgcjonas.gmail.com "
+            "/usr/share/gnome-shell/extensions/appindicatorsupport@rgcjonas.gmail.com.bak"
+        ), shell=True)
+    elif os.path.exists("/usr/share/gnome-shell/extensions/dash-to-dock@micxgx.gmail.com"):
+        run_command((
+            "sudo mv "
+            "/usr/share/gnome-shell/extensions/dash-to-dock@micxgx.gmail.com "
+            "/usr/share/gnome-shell/extensions/dash-to-dock@micxgx.gmail.com.bak"
+        ), shell=True)
+        run_command((
+            "sudo ln -s "
+            "$(pwd)/extensions/system/appindicatorsupport@rgcjonas.gmail.com "
+            "/usr/share/gnome-shell/extensions/"
+        ), shell=True)
+        run_command((
+            "sudo ln -s "
+            "$(pwd)/extensions/system/dash-to-dock@micxgx.gmail.com "
+            "/usr/share/gnome-shell/extensions/"
+        ), shell=True)
+    print("Gnome shell extensions configured. Please log out and log back in to see the changes.")
