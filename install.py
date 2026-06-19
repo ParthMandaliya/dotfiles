@@ -1,220 +1,184 @@
-from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
 from subprocess import run, PIPE
-import warnings
-import shutil
 import os
+import shutil
 
 
-@dataclass
-class PkgMgr:
-    apt: str = "apt"
-    dnf: str = "dnf"
-
-@dataclass
-class Shell:
-    bash: str = "bash"
-    zsh: str = "zsh"
-    fish: str = "fish"
+class PackageManager(str, Enum):
+    APT = "apt"
+    DNF = "dnf"
 
 
-def detect_package_manager():
-    """
-    Detects the system's primary package manager by checking available executables.
-    """
-    if is_package_installed("apt"):
-        return PkgMgr.apt
-    elif is_package_installed("dnf"):
-        return PkgMgr.dnf
+class Shell(str, Enum):
+    BASH = "bash"
+    ZSH = "zsh"
+    FISH = "fish"
+
+
+HOME = Path.home()
+DOTFILES_DIR = Path(__file__).parent
+
+
+def detect_package_manager() -> PackageManager:
+    for mgr in PackageManager:
+        if shutil.which(mgr.value):
+            return mgr
+    raise EnvironmentError("No supported package manager found (apt or dnf).")
+
+
+def detect_shell() -> Shell:
+    shell_name = Path(os.environ.get("SHELL", "")).name
+    try:
+        return Shell(shell_name)
+    except ValueError:
+        raise EnvironmentError(
+            f"Unsupported shell: {shell_name!r}. Supported: {[s.value for s in Shell]}"
+        )
+
+
+def update_repositories(pkgmgr: PackageManager) -> None:
+    if pkgmgr == PackageManager.APT:
+        run(["sudo", "apt", "update"], check=True)
+
+
+def install_package(pkgmgr: PackageManager, *packages: str) -> None:
+    if pkgmgr == PackageManager.APT:
+        run(["sudo", "apt", "install", "-y", *packages], check=True)
+    elif pkgmgr == PackageManager.DNF:
+        run(["sudo", "dnf", "install", "-y", *packages], check=True)
+
+
+def is_installed(name: str) -> bool:
+    return shutil.which(name) is not None
+
+
+def backup(path: Path) -> None:
+    if path.exists() or path.is_symlink():
+        path.rename(path.parent / (path.name + ".bak"))
+
+
+def symlink(src: Path, dst: Path) -> None:
+    backup(dst)
+    dst.symlink_to(src)
+
+
+def append_to_shellrc(shell: Shell, *lines: str) -> None:
+    shellrc = HOME / f".{shell.value}rc"
+    with open(shellrc, "a") as f:
+        f.write("\n")
+        f.writelines(line + "\n" for line in lines)
+
+
+def install_fzf(pkgmgr: PackageManager, shell: Shell) -> None:
+    print("Installing fzf...")
+    install_package(pkgmgr, "fzf")
+
+    version_str = run(
+        ["fzf", "--version"], check=True, stdout=PIPE, text=True
+    ).stdout.split()[0]
+
+    # Parse into a tuple for correct semantic version comparison.
+    # String comparison fails: "0.9.0" > "0.48.0" lexicographically but 0.9.0 < 0.48.0 semantically.
+    version = tuple(int(x) for x in version_str.split("."))
+
+    if version >= (0, 48, 0):
+        append_to_shellrc(shell,
+            "# fzf",
+            'eval "$(fzf --$(basename $SHELL))"',
+        )
     else:
-        raise EnvironmentError("No supported package manager found (apt or dnf).")
+        _configure_fzf_legacy(shell, version_str)
 
-def detect_shell():
-    """
-    Detects the user's default shell.
-    """
-    with open(f"/proc/{os.getppid()}/comm", "r") as f:
-        shell_name = f.read().strip()
-    if shell_name not in (Shell.bash, Shell.zsh, Shell.fish):
-        raise EnvironmentError("No supported shell found (bash, zsh, or fish).")
-    return shell_name
-
-def is_package_installed(package_name: str):
-    """
-    Checks if a package is installed on the system.
-    """
-    return shutil.which(package_name) is not None
-
-def update_repositories(pkgmgr: str):
-    """
-    Updates the apt repositories if the detected package manager is apt.
-    """
-    if pkgmgr == PkgMgr.apt:
-        run(["apt", "update"], check=True, shell=False)
-
-def install_package(pkgmgr: str, package_name: str):
-    """
-    Installs a package using the specified package manager.
-    """
-    if pkgmgr == PkgMgr.apt:
-        run(["apt", "install", "-y", package_name], check=True, shell=False)
-    elif pkgmgr == PkgMgr.dnf:
-        run(["dnf", "install", "-y", package_name], check=True, shell=False)
-
-def run_command(command: str, shell: bool = False, stdout=PIPE):
-    """
-    Runs a shell command and checks for errors.
-    """
-    run(command, check=True, stdout=stdout, shell=shell)
+    print(f"fzf {version_str} configured.")
 
 
-if __name__ == "__main__":
+def _configure_fzf_legacy(shell: Shell, version: str) -> None:
+    fzf_dir = HOME / ".config" / "fzf"
+    fzf_dir.mkdir(parents=True, exist_ok=True)
+
+    base = f"https://raw.githubusercontent.com/junegunn/fzf/refs/tags/{version}/shell"
+    completion = fzf_dir / f"completion.{shell.value}"
+
+    run(["wget", f"{base}/completion.{shell.value}", "-O", str(completion)], check=True)
+    lines = ["# fzf", f"source {completion}"]
+
+    if shell != Shell.FISH:
+        key_bindings = fzf_dir / f"key-bindings.{shell.value}"
+        run(["wget", f"{base}/key-bindings.{shell.value}", "-O", str(key_bindings)], check=True)
+        lines.append(f"source {key_bindings}")
+
+    append_to_shellrc(shell, *lines)
+
+
+def install_starship(pkgmgr: PackageManager, shell: Shell) -> None:
+    print("Installing starship dependencies...")
+    install_package(pkgmgr, "zip", "unzip", "curl", "wget")
+
+    print("Installing FiraCode Nerd Font...")
+    fonts_dir = HOME / ".fonts" / "FiraCode"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    firacode_zip = Path("/tmp/FiraCode.zip")
+    run(
+        ["wget", "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/FiraCode.zip",
+         "-O", str(firacode_zip)],
+        check=True,
+    )
+    run(["unzip", "-o", str(firacode_zip), "-d", str(fonts_dir)], check=True)
+    firacode_zip.unlink()
+
+    print("Installing starship (follow any prompts)...")
+    run("curl -sS https://starship.rs/install.sh | sh", shell=True, check=True)
+
+    config_dir = HOME / ".config"
+    config_dir.mkdir(exist_ok=True)
+    symlink(DOTFILES_DIR / "starship.toml", config_dir / "starship.toml")
+
+    append_to_shellrc(shell,
+        "# starship",
+        'eval "$(starship init $(basename $SHELL))"',
+    )
+    print("Starship configured.")
+
+
+def install_vim(pkgmgr: PackageManager) -> None:
+    print("Installing vim...")
+    install_package(pkgmgr, "vim")
+    symlink(DOTFILES_DIR / ".vimrc", HOME / ".vimrc")
+    print("vim configured.")
+
+
+def configure_aliases(shell: Shell) -> None:
+    append_to_shellrc(shell,
+        "# aliases",
+        "alias ll='ls -alF'",
+        "alias la='ls -A'",
+        "alias l='ls -CF'",
+        "alias c=clear",
+    )
+
+
+def main() -> None:
     pkgmgr = detect_package_manager()
-    print(f"Detected package manager: {pkgmgr}")
+    print(f"Package manager: {pkgmgr.value}")
+
+    shell = detect_shell()
+    print(f"Shell: {shell.value}")
+
+    shellrc = HOME / f".{shell.value}rc"
+    backup(shellrc)
+    shellrc.touch(exist_ok=True)
 
     update_repositories(pkgmgr)
 
-    # installing wget
-    print("Installing wget...")
-    install_package(pkgmgr, "wget")
+    install_fzf(pkgmgr, shell)
+    install_starship(pkgmgr, shell)
+    install_vim(pkgmgr)
+    configure_aliases(shell)
 
-    # installing fzf
-    print("Installing fzf...")
-    install_package(pkgmgr, "fzf")
-    
-    # check fzf version
-    fzf_version = run(
-        "fzf --version | awk '{print $1}'",
-        check=True, stdout=PIPE, shell=True
-    ).stdout.decode().strip()
-    print(f"Installed fzf version: {fzf_version}")
-
-    shell = detect_shell()
-    # backup .{shell}rc
-    if os.path.exists(f"{os.getenv('HOME')}/.{shell}rc"):
-        run_command(f"cp {os.getenv('HOME')}/.{shell}rc {os.getenv('HOME')}/.{shell}rc.bak", shell=True)
-
-    run_command(f"mkdir -p {os.getenv('HOME')}/.config", shell=True)        
-    if fzf_version < "0.48.0":
-        completion_url = f"https://raw.githubusercontent.com/junegunn/fzf/refs/tags/{fzf_version}/shell/completion.{shell}"
-        key_bindings_url = f"https://raw.githubusercontent.com/junegunn/fzf/refs/tags/{fzf_version}/shell/key-bindings.{shell}"
-
-        run_command(f"mkdir -p {os.getenv('HOME')}/.config/fzf", shell=True)        
-        if shell == Shell.fish:
-            run_command(
-                f"wget {completion_url} -O {os.getenv('HOME')}/.config/fzf/ ",
-                shell=True
-            )
-            with open(f"{os.getenv('HOME')}/.{shell}rc", "a") as shellrc:
-                shellrc.write("\n\n# fzf configuration\n")
-                shellrc.write(f"source {os.getenv('HOME')}/.config/fzf/completion.{shell}\n")
-        else:
-            run_command(
-                f"wget {completion_url} -O {os.getenv('HOME')}/.config/fzf/completion.{shell}",
-                shell=True
-            )
-            run_command(
-                f"wget {key_bindings_url} -O {os.getenv('HOME')}/.config/fzf/key-bindings.{shell}",
-                shell=True
-            )
-            with open(f"{os.getenv('HOME')}/.{shell}rc", "a") as shellrc:
-                shellrc.write("\n# fzf configuration\n")
-                shellrc.write(f"source {os.getenv('HOME')}/.config/fzf/completion.{shell}\n")
-                shellrc.write(f"source {os.getenv('HOME')}/.config/fzf/key-bindings.{shell}\n")
-    else:
-        with open(f"{os.getenv('HOME')}/.{shell}rc", "a") as shellrc:
-            shellrc.write("\n# fzf configuration\n")
-            shellrc.write(f'eval "$(fzf --$(echo $SHELL | cut -d"/" -f3))"\n')
-            # shellrc.write(f'eval "$(fzf --{shell})"\n')
-
-    print(f"fzf configuration added to {os.getenv('HOME')}/.{shell}rc")
-
-    # installing starship
-    print("Installing starship dependencies packages...")
-    install_package(pkgmgr, "zip")
-    install_package(pkgmgr, "unzip")
-    install_package(pkgmgr, "curl")
+    print(f"\nDone. Logout and back in to see the new font in action.")
+    print("Enjoy your new setup!")
 
 
-    print("Installing firacode fonts...")
-    run_command(
-        "wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/FiraCode.zip -O /tmp/FiraCode.zip",
-        shell=True
-    )
-    run_command(f"mkdir -p {os.getenv('HOME')}/.fonts/FiraCode", shell=True)
-    run_command(f"unzip -o /tmp/FiraCode.zip -d {os.getenv('HOME')}/.fonts/FiraCode", shell=True)
-    run_command("rm /tmp/FiraCode.zip", shell=True)
-
-    print("Installing Starship, please follow the instructions on the terminal to complete the installation...")
-    run_command("curl -sS https://starship.rs/install.sh | sh", shell=True, stdout=None)
-    run_command(f"ln -s $(pwd)/starship.toml {os.getenv('HOME')}/.config/starship.toml", shell=True)
-    with open(f"{os.getenv('HOME')}/.{shell}rc", "a") as shellrc:
-        shellrc.write("\n# Starship configuration\n")
-        shellrc.write(f'eval "$(starship init $(echo $SHELL | cut -d"/" -f3))"\n')
-        # shellrc.write(f'eval "$(starship init {shell})"\n')
-        # shellrc.write(f'eval "$(starship init $SHELL)"\n')
-
-    # installing vim
-    print("Installing vim...")
-    install_package(pkgmgr, "vim")
-    if os.path.exists(f"{os.getenv('HOME')}/.vimrc"):
-        run_command(f"cp {os.getenv('HOME')}/.vimrc {os.getenv('HOME')}/.vimrc.bak", shell=True)
-    run_command(f"ln -s $(pwd)/.vimrc {os.getenv('HOME')}/.vimrc", shell=True)
-
-    # custom aliases
-    with open(f"{os.getenv('HOME')}/.{shell}rc", "a") as shellrc:
-        shellrc.write("\n# Custom aliases\n")
-        shellrc.write("alias ll='ls -alF'\n")
-        shellrc.write("alias la='ls -A'\n")
-        shellrc.write("alias l='ls -CF'\n")
-        shellrc.write("alias c=clear\n")
-
-    # TODO: install com.mattjakeman.ExtensionManager using flatpak, if flatpak is not installed, 
-    # prompt user to install flatpak manually and then install com.mattjakeman.ExtensionManager using flatpak
-    if not is_package_installed("flatpak"):
-        warnings.warn(
-            "Flatpak is not installed. Please install and configure Flatpak manually and "
-            "install com.mattjakeman.ExtensionManager using Flatpak to manage your shell extensions."
-        )
-
-    # backup $HOME/.local/share/gnome-shell/extensions
-    os.makedirs(f"{os.getenv('HOME')}/.local/share/gnome-shell/extensions", exist_ok=True)
-    run_command((
-        f"mv {os.getenv('HOME')}/.local/share/gnome-shell/extensions "
-        f"{os.getenv('HOME')}/.local/share/gnome-shell/extensions.bak"
-    ), shell=True)
-
-    run_command((
-        "ln -s "
-        "$(pwd)/extensions/local "
-        f"{os.getenv('HOME')}/.local/share/gnome-shell/extensions"
-    ), shell=True)
-
-    if not is_package_installed("gnome-shell-extension-appindicator"):
-        install_package(pkgmgr, "gnome-shell-extension-appindicator")
-    if not is_package_installed("gnome-shell-extension-dash-to-dock"):
-        install_package(pkgmgr, "gnome-shell-extension-dash-to-dock")
-    
-    run_command("sudo mkdir -p /usr/share/gnome-shell/extensions/", shell=True)
-    if os.path.exists("/usr/share/gnome-shell/extensions/appindicatorsupport@rgcjonas.gmail.com"):
-        run_command((
-            "sudo mv "
-            "/usr/share/gnome-shell/extensions/appindicatorsupport@rgcjonas.gmail.com "
-            "/usr/share/gnome-shell/extensions/appindicatorsupport@rgcjonas.gmail.com.bak"
-        ), shell=True)
-    elif os.path.exists("/usr/share/gnome-shell/extensions/dash-to-dock@micxgx.gmail.com"):
-        run_command((
-            "sudo mv "
-            "/usr/share/gnome-shell/extensions/dash-to-dock@micxgx.gmail.com "
-            "/usr/share/gnome-shell/extensions/dash-to-dock@micxgx.gmail.com.bak"
-        ), shell=True)
-        run_command((
-            "sudo ln -s "
-            "$(pwd)/extensions/system/appindicatorsupport@rgcjonas.gmail.com "
-            "/usr/share/gnome-shell/extensions/"
-        ), shell=True)
-        run_command((
-            "sudo ln -s "
-            "$(pwd)/extensions/system/dash-to-dock@micxgx.gmail.com "
-            "/usr/share/gnome-shell/extensions/"
-        ), shell=True)
-    print("Gnome shell extensions configured. Please log out and log back in to see the changes.")
+if __name__ == "__main__":
+    main()
