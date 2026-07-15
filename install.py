@@ -55,7 +55,11 @@ def is_installed(name: str) -> bool:
 
 def backup(path: Path) -> None:
     if path.exists() or path.is_symlink():
-        path.rename(path.parent / (path.name + ".bak"))
+        backup_path = path.parent / (path.name + ".bak")
+        if path.is_dir() and not path.is_symlink():
+            shutil.copytree(path, backup_path)
+        else:
+            shutil.copy2(path, backup_path, follow_symlinks=True)
 
 
 def symlink(src: Path, dst: Path) -> None:
