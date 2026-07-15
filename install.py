@@ -180,6 +180,19 @@ def main() -> None:
     install_vim(pkgmgr)
     configure_aliases(shell)
 
+    # TODO:
+    # ask user if they want to install extension?
+    # if yes:
+    #   install make
+    #   clone https://github.com/icedman/search-light.git
+    #   checkout to 4e93e0e3e2fba8512dfd588177b7a6a2a71c9f1e
+    #   cd search-light
+    #   make
+    # install gnome-shell-extension-appindicator gnome-shell-extension-dash-to-dock
+    # inform user to install flatpak and com.mattjakeman.ExtensionManager
+    # and configure the extensions however they like
+
+
     print(f"\nDone. Logout and back in to see the new font in action.")
     print("Enjoy your new setup!")
 
