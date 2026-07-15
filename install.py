@@ -191,7 +191,8 @@ def main() -> None:
     # install gnome-shell-extension-appindicator gnome-shell-extension-dash-to-dock
     # inform user to install flatpak and com.mattjakeman.ExtensionManager
     # and configure the extensions however they like
-
+    # inform user to install Clipboard Indicator by Tudmotu from extension 
+    # manager by themselves
 
     print(f"\nDone. Logout and back in to see the new font in action.")
     print("Enjoy your new setup!")
