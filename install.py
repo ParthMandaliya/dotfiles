@@ -49,6 +49,31 @@ def install_package(pkgmgr: PackageManager, *packages: str) -> None:
         run(["sudo", "dnf", "install", "-y", *packages], check=True)
 
 
+def clone_repo(
+        repo_url: str,
+        destination: Path | None = None,
+        checkout: str | None = None
+    ) -> Path:
+    repo_name = Path(repo_url.rstrip("/"))
+    if repo_name.suffix == ".git":
+        repo_name = repo_name.with_suffix("")
+    repo_name = Path(repo_name.name)
+
+    if destination is None:
+        destination = HOME / repo_name
+
+    if destination.exists():
+        raise FileExistsError(f"Destination already exists: {destination}")
+
+    run(["git", "clone", repo_url, str(destination)], check=True)
+
+    if checkout is not None:
+        # checkout can be a branch, tag, or commit id
+        run(["git", "-C", str(destination), "checkout", checkout], check=True)
+
+    return destination
+
+
 def is_installed(name: str) -> bool:
     return shutil.which(name) is not None
 
@@ -60,6 +85,8 @@ def backup(path: Path) -> None:
             shutil.copytree(path, backup_path)
         else:
             shutil.copy2(path, backup_path, follow_symlinks=True)
+
+
 
 
 def symlink(src: Path, dst: Path) -> None:
@@ -180,19 +207,32 @@ def main() -> None:
     install_vim(pkgmgr)
     configure_aliases(shell)
 
-    # TODO:
-    # ask user if they want to install extension?
-    # if yes:
-    #   install make
-    #   clone https://github.com/icedman/search-light.git
-    #   checkout to 4e93e0e3e2fba8512dfd588177b7a6a2a71c9f1e
-    #   cd search-light
-    #   make
-    # install gnome-shell-extension-appindicator gnome-shell-extension-dash-to-dock
-    # inform user to install flatpak and com.mattjakeman.ExtensionManager
-    # and configure the extensions however they like
-    # inform user to install Clipboard Indicator by Tudmotu from extension 
-    # manager by themselves
+    # Untested code
+    resp = input("Do you want to continue with installing GNOME extension (y/n)?").lower()
+    while resp not in ("y", "yes", "n", "no"):
+        print("Invalid response...")
+    if resp in ("y", "yes"):
+        install_package(pkgmgr, "make")
+        dest = clone_repo(
+            "https://github.com/icedman/search-light.git",
+            checkout="4e93e0e3e2fba8512dfd588177b7a6a2a71c9f1e"
+        )
+        run(["cd", f"{str(dest)}", "&&", "make"], check=True)
+        print("Installed search light")
+        
+        install_package(pkgmgr, "gnome-shell-extension-appindicator")
+        print("Installed appindicator extension")
+        
+        install_package(pkgmgr, "gnome-shell-extension-dash-to-dock")
+        print("Installed dash-to-dock")  
+
+        print()
+        print("Logout and log back in for extension to take effect.")
+        print()
+        print("Please install Flatpak and then use it to install com.mattjakeman.ExtensionManager.")
+        print("Afterward, install the Clipboard Indicator extension by Tudmotu through the Extension Manager.")
+        print()
+        print("You can use the extension manager to configure the behaviour and appearance of newly installed extensions.")
 
     print(f"\nDone. Logout and back in to see the new font in action.")
     print("Enjoy your new setup!")
