@@ -1,0 +1,11 @@
+{
+  "name": "Background Logo",
+  "description": "Overlay a tasteful logo on the background to enhance the user experience",
+  "uuid": "background-logo@fedorahosted.org",
+  "settings-schema": "org.fedorahosted.background-logo-extension",
+  "shell-version": [
+    "50"
+  ],
+  "version-name": "50.1",
+  "url": "https://forge.fedoraproject.org/workstation/background-logo-extension"
+}

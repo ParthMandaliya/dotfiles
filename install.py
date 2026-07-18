@@ -78,6 +78,7 @@ def is_installed(name: str) -> bool:
     return shutil.which(name) is not None
 
 
+# Untested code
 def backup(path: Path) -> None:
     if path.exists() or path.is_symlink():
         backup_path = path.parent / (path.name + ".bak")
@@ -85,8 +86,6 @@ def backup(path: Path) -> None:
             shutil.copytree(path, backup_path)
         else:
             shutil.copy2(path, backup_path, follow_symlinks=True)
-
-
 
 
 def symlink(src: Path, dst: Path) -> None:
@@ -211,28 +210,42 @@ def main() -> None:
     resp = input("Do you want to continue with installing GNOME extension (y/n)?").lower()
     while resp not in ("y", "yes", "n", "no"):
         print("Invalid response...")
-    if resp in ("y", "yes"):
-        install_package(pkgmgr, "make")
-        dest = clone_repo(
-            "https://github.com/icedman/search-light.git",
-            checkout="4e93e0e3e2fba8512dfd588177b7a6a2a71c9f1e"
-        )
-        run(["cd", f"{str(dest)}", "&&", "make"], check=True)
-        print("Installed search light")
-        
-        install_package(pkgmgr, "gnome-shell-extension-appindicator")
-        print("Installed appindicator extension")
-        
-        install_package(pkgmgr, "gnome-shell-extension-dash-to-dock")
-        print("Installed dash-to-dock")  
+    if resp in ("n", "no"):
+        import sys
+        sys.exit(0)
 
-        print()
-        print("Logout and log back in for extension to take effect.")
-        print()
-        print("Please install Flatpak and then use it to install com.mattjakeman.ExtensionManager.")
-        print("Afterward, install the Clipboard Indicator extension by Tudmotu through the Extension Manager.")
-        print()
-        print("You can use the extension manager to configure the behaviour and appearance of newly installed extensions.")
+    install_package(pkgmgr, "make")
+    dest = clone_repo(
+        "https://github.com/icedman/search-light.git",
+        checkout="4e93e0e3e2fba8512dfd588177b7a6a2a71c9f1e"
+    )
+    run(["cd", f"{str(dest)}", "&&", "make"], check=True)
+    print("Installed search light")
+    
+    install_package(pkgmgr, "gnome-shell-extension-appindicator")
+    print("Installed appindicator extension")
+    
+    install_package(pkgmgr, "gnome-shell-extension-dash-to-dock")
+    print("Installed dash-to-dock")  
+
+    # TODO:
+    # Add the code to copy extensions available with this repo 
+    # to right places
+    # extensions/local -> ~/.local/share/gnome-shell/extensions/
+    # extensions/system -> /usr/share/gnome-shell/extensions/ 
+    # Ask user to install flatpak and via flatpak, install com.mattjakeman.ExtensionManager
+    # if not already installed. From extension manager user can manage extensions 
+
+    # TODO:
+    # After adding the above code, re-write the below statements.
+    
+    print()
+    print("Logout and log back in for extension to take effect.")
+    print()
+    print("Please install Flatpak and then use it to install com.mattjakeman.ExtensionManager.")
+    print("Afterward, install the Clipboard Indicator extension by Tudmotu through the Extension Manager.")
+    print()
+    print("You can use the extension manager to configure the behaviour and appearance of newly installed extensions.")
 
     print(f"\nDone. Logout and back in to see the new font in action.")
     print("Enjoy your new setup!")

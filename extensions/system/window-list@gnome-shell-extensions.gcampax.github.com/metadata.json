@@ -1,0 +1,12 @@
+{
+  "name": "Window List",
+  "description": "Display a window list at the bottom of the screen.\nThis extension is part of Classic Mode and is officially supported by GNOME. Please do not report bugs using the form below, use GNOME's GitLab instance instead.",
+  "uuid": "window-list@gnome-shell-extensions.gcampax.github.com",
+  "gettext-domain": "gnome-shell-extensions",
+  "settings-schema": "org.gnome.shell.extensions.window-list",
+  "shell-version": [
+    "50"
+  ],
+  "version-name": "50.2",
+  "url": "https://gitlab.gnome.org/GNOME/gnome-shell-extensions"
+}
