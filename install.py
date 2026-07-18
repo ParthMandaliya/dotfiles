@@ -237,6 +237,19 @@ def main() -> None:
     # if not already installed. From extension manager user can manage extensions 
 
     # TODO:
+    # Modidy the following files, and add the new code, new code
+    #  will handle the lid-close action
+    # 
+    # sudo mkdir -p /etc/systemd/logind.conf.d
+    # sudo tee /etc/systemd/logind.conf.d/lid-switch.conf << 'EOF'
+    # [Login]
+    # HandleLidSwitch=ignore
+    # HandleLidSwitchExternalPower=ignore
+    # HandleLidSwitchDocked=ignore
+    # EOF
+    # sudo systemctl restart systemd-logind
+
+    # TODO:
     # After adding the above code, re-write the below statements.
     
     print()
