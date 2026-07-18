@@ -250,6 +250,26 @@ def main() -> None:
     # sudo systemctl restart systemd-logind
 
     # TODO:
+    # loginctl enable-linger $USER
+    # don't let systemd stop when logged out, otherwise plex.container and 
+    # tailscale.container will stop too
+    # 
+    # sudo firewall-cmd --permanent --add-port=32400/tcp
+    # enables the 32400 port for plex permanently (not necessary if using tailscale)
+    # sudo firewall-cmd --reload
+    # reload the firewall to apply changes
+    # 
+    # gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
+    # gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 0
+    # do not let laptop go to sleep or suspension ever
+    # 
+    # sudo -U gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
+    # sudo -U gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 0
+    # if user never has logged in (fresh reboot for example) laptop will go to 
+    # sleep/suspension after sometime (no user logged in; root settings apply, this changes
+    # root settings)
+
+    # TODO:
     # After adding the above code, re-write the below statements.
     
     print()
