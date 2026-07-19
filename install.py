@@ -270,6 +270,10 @@ def main() -> None:
     # root settings)
 
     # TODO:
+    # Install tailscale cli using the below given command:
+    # curl -fsSL https://tailscale.com/install.sh | sh
+
+    # TODO:
     # After adding the above code, re-write the below statements.
     
     print()
