@@ -254,8 +254,8 @@ def main() -> None:
     # don't let systemd stop when logged out, otherwise plex.container and 
     # tailscale.container will stop too
     # 
-    # sudo firewall-cmd --permanent --add-port=32400/tcp
-    # enables the 32400 port for plex permanently (not necessary if using tailscale)
+    # sudo firewall-cmd --permanent --add-port=8096/tcp
+    # enables the 8096 port for jellyfin permanently (not necessary if using tailscale)
     # sudo firewall-cmd --reload
     # reload the firewall to apply changes
     # 
